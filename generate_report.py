@@ -1,25 +1,118 @@
-import datetime
+import argparse
+import os
+from datetime import datetime
+from fetch_news import fetch_news
+from fetch_market import fetch_market_data
+from analyze_news import analyze_articles, calculate_market_sentiment
+import config
 
-# Current date and time
-now = datetime.datetime.now()
+def generate_pre_market_report(articles, market_data):
+    """生成盘前分析报告"""
+    analyzed = analyze_articles(articles)
+    sentiment = calculate_market_sentiment(analyzed)
+    
+    bullish = [a for a in analyzed if a['sentiment']['label'] == '看涨']
+    bearish = [a for a in analyzed if a['sentiment']['label'] == '看跌']
+    
+    report = f"""# 📈 美股盘前分析报告
+**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-# Generate market sentiment evaluation
-market_sentiment = "根据目前的数据，市场情绪非常积极，投资者对未来几个月的前景持乐观态度。"
+## 🔮 市场情绪评估
 
-# Generate hot news analysis
-hot_news = "最近的热点新闻包括技术股的反弹和经济增长的预期，刺激了投资者的兴趣。"
+| 指标 | 数值 |
+|-----|------|
+| 市场情绪 | {sentiment['emoji']} **{sentiment['label']}** |
+| 情感评分 | {sentiment['score']} |
+| 看涨新闻 | {len(bullish)} 条 |
+| 看跌新闻 | {len(bearish)} 条 |
 
-# Technical Predictions
-technical_predictions = "根据技术分析，未来几个月可能会出现短期的波动，但整体趋势向上。"
+## 📰 热点新闻 (Top 5)
+"""
+    
+    for i, article in enumerate(analyzed[:5], 1):
+        report += f"\n{i}. **{article['title']}**\n"
+        report += f"   来源: {article['source']} | {article['sentiment']['emoji']} {article['sentiment']['label']}\n"
+    
+    report += f"""
+## 📊 关键股指行情
 
-# Market Outlook Recommendations
-market_outlook = "建议投资者关注科技股和消费品股，这些领域预计将在未来几个月表现良好。"
+| 代码 | 开盘 | 收盘 | 涨跌幅 |
+|-----|------|------|--------|
+"""
+    
+    for symbol, data in market_data.items():
+        report += f"| {symbol} | ${data['open']} | ${data['close']} | {data['change_pct']:+.2f}% |\n"
+    
+    return report
 
-# Compile the report
-report = f'''\n市场前景分析报告 \n===================================\n\n生成日期：{now.strftime('%Y-%m-%d %H:%M:%S')}\n\n市场情绪评估：{market_sentiment}\n\n热点新闻分析：{hot_news}\n\n技术预测：{technical_predictions}\n\n市场展望推荐：{market_outlook}\n===================================\n'''
+def generate_post_market_report(articles, market_data):
+    """生成盘后展望报告"""
+    analyzed = analyze_articles(articles)
+    sentiment = calculate_market_sentiment(analyzed)
+    
+    report = f"""# 📉 美股盘后展望报告
+**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-# Write the report to a file
-with open('analysis_report.txt', 'w', encoding='utf-8') as file:
-    file.write(report)
+## 📊 今日行情总结
 
-print('分析报告生成完毕！')
+| 代码 | 开盘 | 收盘 | 涨跌幅 |
+|-----|------|------|--------|
+"""
+    
+    for symbol, data in market_data.items():
+        change_emoji = "📈" if data['change_pct'] > 0 else "📉"
+        report += f"| {change_emoji} {symbol} | ${data['open']} | ${data['close']} | {data['change_pct']:+.2f}% |\n"
+    
+    report += f"""
+## 🎯 市场情绪评估
+
+| 指标 | 数值 |
+|-----|------|
+| 市场情绪 | {sentiment['emoji']} **{sentiment['label']}** |
+| 情感评分 | {sentiment['score']} |
+
+## 📰 今日热点新闻 (Top 5)
+"""
+    
+    for i, article in enumerate(analyzed[:5], 1):
+        report += f"\n{i}. **{article['title']}**\n"
+        report += f"   来源: {article['source']} | {article['sentiment']['emoji']} {article['sentiment']['label']}\n"
+    
+    report += "\n---\n\n✅ 报告生成完成！\n"
+    return report
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mode', default='pre', choices=['pre', 'post'])
+    args = parser.parse_args()
+    
+    if not config.NEWS_API_KEY:
+        print("❌ 错误: NEWS_API_KEY 未配置")
+        return
+    
+    print("📥 正在获取数据...")
+    articles = fetch_news(config.NEWS_API_KEY, config.MONITOR_SYMBOLS, mode=args.mode)
+    market_data = fetch_market_data(config.MONITOR_SYMBOLS)
+    
+    if not articles or not market_data:
+        print("❌ 无法获取数据")
+        return
+    
+    print("✍️ 正在生成报告...")
+    if args.mode == 'pre':
+        report = generate_pre_market_report(articles, market_data)
+    else:
+        report = generate_post_market_report(articles, market_data)
+    
+    timestamp = datetime.now().strftime('%Y-%m-%d')
+    period = 'AM' if args.mode == 'pre' else 'PM'
+    filename = f"{config.REPORTS_DIR}/report_{timestamp}_{period}.md"
+    
+    os.makedirs(config.REPORTS_DIR, exist_ok=True)
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write(report)
+    
+    print(f"✅ 报告已生成: {filename}")
+
+if __name__ == '__main__':
+    main()
