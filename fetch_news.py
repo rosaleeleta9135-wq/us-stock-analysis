@@ -1,1 +1,38 @@
-import requests\nimport json\n\ndef fetch_news(stock_symbols, mode='pre-market'):\n    api_key = 'YOUR_NEWSAPI_KEY'  # Replace with your actual NewsAPI key\n    base_url = 'https://newsapi.org/v2/everything'\n    articles = []\n\n    for symbol in stock_symbols:\n        parameters = {\n            'q': symbol,\n            'from': '2023-03-28',  # Customize the date if necessary\n            'sortBy': 'publishedAt',\n            'apiKey': api_key,\n            'pageSize': 100\n        }\n\n        response = requests.get(base_url, params=parameters)\n        if response.status_code == 200:\n            data = response.json()\n            articles.extend(data.get('articles', []))\n        else:\n            print(f'Failed to fetch news for {symbol}: {response.status_code}')\n\n    # Save articles to a JSON file\n    mode_str = 'pre_market' if mode == 'pre-market' else 'post_market'\n    with open(f'{mode_str}_news.json', 'w') as json_file:\n        json.dump(articles, json_file, indent=4)\n\n    return articles\n\n# Example usage\nif __name__ == '__main__':\n    symbols = ['AAPL', 'GOOGL']  # Replace with your stock symbols\n    fetch_news(symbols, mode='post-market')
+import requests
+from datetime import datetime, timedelta
+
+def fetch_news(api_key, symbols, mode='pre'):
+    """获取美股新闻"""
+    all_articles = []
+    
+    for symbol in symbols:
+        query = f"({symbol} stock) OR (USA market)"
+        
+        if mode == 'pre':
+            from_date = (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%d')
+        else:
+            from_date = datetime.now().strftime('%Y-%m-%d')
+        
+        url = "https://newsapi.org/v2/everything"
+        params = {
+            'q': query,
+            'sortBy': 'publishedAt',
+            'language': 'en',
+            'from': from_date,
+            'apiKey': api_key,
+            'pageSize': 50,
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                articles = data.get('articles', [])
+                all_articles.extend(articles)
+                print(f"✓ 获取 {symbol} 的 {len(articles)} 条新闻")
+            else:
+                print(f"✗ NewsAPI 失败: {response.status_code}")
+        except Exception as e:
+            print(f"✗ 异常: {str(e)}")
+    
+    return all_articles
