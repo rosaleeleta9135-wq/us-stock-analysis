@@ -1,1 +1,57 @@
-from textblob import TextBlob\n\n\ndef analyze_sentiment(article):\n    """Analyze the sentiment of an article."""\n    analysis = TextBlob(article)\n    polarity = analysis.sentiment.polarity\n\n    if polarity > 0.1:\n        return 'bullish'\n    elif polarity < -0.1:\n        return 'bearish'\n    else:\n        return 'neutral'\n\ndef calculate_market_sentiment(articles):\n    """Calculate market sentiment scores from multiple articles."""\n    bullish_count = 0\n    bearish_count = 0\n    neutral_count = 0\n\n    for article in articles:\n        sentiment = analyze_sentiment(article)\n        if sentiment == 'bullish':\n            bullish_count += 1\n        elif sentiment == 'bearish':\n            bearish_count += 1\n        else:\n            neutral_count += 1\n\n    total_articles = len(articles)\n    if total_articles == 0:\n        return {'bullish': 0, 'bearish': 0, 'neutral': 0}\n\n    return {\n        'bullish': bullish_count / total_articles,\n        'bearish': bearish_count / total_articles,\n        'neutral': neutral_count / total_articles\n    }\n
+from textblob import TextBlob
+
+def analyze_sentiment(text):
+    """分析情感倾向"""
+    try:
+        analysis = TextBlob(text)
+        polarity = analysis.sentiment.polarity
+        
+        if polarity > 0.1:
+            return {'score': round(polarity, 3), 'label': '看涨', 'emoji': '📈'}
+        elif polarity < -0.1:
+            return {'score': round(polarity, 3), 'label': '看跌', 'emoji': '📉'}
+        else:
+            return {'score': round(polarity, 3), 'label': '中立', 'emoji': '➡️'}
+    except:
+        return {'score': 0, 'label': '未知', 'emoji': '❓'}
+
+def analyze_articles(articles):
+    """分析一批文章"""
+    analyzed = []
+    
+    for article in articles:
+        title = article.get('title', '')
+        description = article.get('description', '')
+        text = f"{title}. {description if description else ''}"
+        
+        sentiment = analyze_sentiment(text)
+        analyzed.append({
+            'title': title,
+            'source': article.get('source', {}).get('name', 'Unknown'),
+            'url': article.get('url', ''),
+            'sentiment': sentiment,
+        })
+    
+    return analyzed
+
+def calculate_market_sentiment(analyzed_articles):
+    """计算市场情感评分"""
+    if not analyzed_articles:
+        return {'label': '无数据', 'score': 0, 'emoji': '❓'}
+    
+    total_score = sum(article['sentiment']['score'] for article in analyzed_articles)
+    avg_score = total_score / len(analyzed_articles)
+    
+    if avg_score > 0.1:
+        label, emoji = '看涨', '📈'
+    elif avg_score < -0.1:
+        label, emoji = '看跌', '📉'
+    else:
+        label, emoji = '中立', '➡️'
+    
+    return {
+        'label': label,
+        'emoji': emoji,
+        'score': round(avg_score, 3),
+        'total_articles': len(analyzed_articles),
+    }
