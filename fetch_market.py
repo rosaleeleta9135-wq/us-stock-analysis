@@ -1,1 +1,28 @@
-import yfinance as yf\n\nclass MarketFetcher:\n    def __init__(self, ticker):\n        self.ticker = ticker\n        self.data = None\n\n    def fetch_data(self):\n        stock = yf.Ticker(self.ticker)\n        self.data = stock.history(period='1d')\n\n    def get_open(self):\n        return self.data['Open'][0] if self.data is not None else None\n\n    def get_close(self):\n        return self.data['Close'][0] if self.data is not None else None\n\n    def get_high(self):\n        return self.data['High'][0] if self.data is not None else None\n\n    def get_low(self):\n        return self.data['Low'][0] if self.data is not None else None\n\n    def get_volume(self):\n        return self.data['Volume'][0] if self.data is not None else None\n\n    def get_daily_percentage_change(self):\n        if self.data is not None:\n            open_price = self.get_open()\n            close_price = self.get_close()\n            if open_price is not None and close_price is not None:\n                return ((close_price - open_price) / open_price) * 100\n        return None\n\nif __name__ == '__main__':\n    ticker_symbol = 'AAPL' # Example: Apple Inc.\n    fetcher = MarketFetcher(ticker_symbol)\n    fetcher.fetch_data()\n    print(f"Open: {fetcher.get_open()}")\n    print(f"Close: {fetcher.get_close()}")\n    print(f"High: {fetcher.get_high()}")\n    print(f"Low: {fetcher.get_low()}")\n    print(f"Volume: {fetcher.get_volume()}")\n    print(f"Daily Percentage Change: {fetcher.get_daily_percentage_change():.2f}%")\n
+import yfinance as yf
+
+def fetch_market_data(symbols):
+    """获取股票行情数据"""
+    market_data = {}
+    
+    for symbol in symbols:
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period='2d')
+            
+            if len(hist) > 0:
+                latest = hist.iloc[-1]
+                market_data[symbol] = {
+                    'symbol': symbol,
+                    'date': str(hist.index[-1].date()),
+                    'open': round(float(latest['Open']), 2),
+                    'close': round(float(latest['Close']), 2),
+                    'high': round(float(latest['High']), 2),
+                    'low': round(float(latest['Low']), 2),
+                    'volume': int(latest['Volume']),
+                    'change_pct': round((latest['Close'] - latest['Open']) / latest['Open'] * 100, 2),
+                }
+                print(f"✓ 获取 {symbol} 行情数据成功")
+        except Exception as e:
+            print(f"✗ 获取 {symbol} 失败: {str(e)}")
+    
+    return market_data
